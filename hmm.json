@@ -92,8 +92,9 @@
     },
     {
       "name": "extension-haptics",
-      "type": "haxelib",
-      "version": "1.0.4"
+      "type": "git",
+      "ref": "8978b34b437f943a0d164bd6b3d8b69bd0025081",
+      "url": "https://github.com/LimeExtensions/extension-haptics"
     },
     {
       "name": "tink_core",
