@@ -3012,6 +3012,7 @@ class PlayState extends MusicBeatState
 	{
 		if (spr == null)
 			return;
+		spr.container = null;
 		spr.kill();
 		spr.velocity.set();
 		spr.acceleration.set();

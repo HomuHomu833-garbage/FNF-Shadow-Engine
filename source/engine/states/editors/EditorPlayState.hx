@@ -778,6 +778,7 @@ class EditorPlayState extends MusicBeatSubstate
 			FlxTween.tween(numScore, {alpha: 0}, 0.2 / playbackRate, {
 				onComplete: function(tween:FlxTween)
 				{
+					numScore.container = null;
 					numScore.destroy();
 				},
 				startDelay: Conductor.crochet * 0.002 / playbackRate
@@ -798,12 +799,18 @@ class EditorPlayState extends MusicBeatSubstate
 
 		FlxTween.tween(rating, {alpha: 0}, 0.2 / playbackRate, {
 			startDelay: Conductor.crochet * 0.001 / playbackRate
+			onComplete: function(tween:FlxTween)
+			{
+				rating.container = null;
+				rating.destroy();
+			},
 		});
 
 		FlxTween.tween(comboSpr, {alpha: 0}, 0.2 / playbackRate, {
 			onComplete: function(tween:FlxTween)
 			{
 				coolText.destroy();
+				comboSpr.container = null;
 				comboSpr.destroy();
 
 				rating.destroy();
