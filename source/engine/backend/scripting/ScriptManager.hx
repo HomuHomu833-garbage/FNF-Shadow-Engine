@@ -42,9 +42,6 @@ class ScriptManager
 
 	public function call(funcToCall:String, args:Array<Dynamic> = null, ?opts:CallOptions):Dynamic
 	{
-		if (luaArray.length == 0 && hscriptArray.length == 0)
-			return ScriptResult.Continue;
-
 		if (opts == null)
 			opts = {};
 		if (args == null)
@@ -63,9 +60,6 @@ class ScriptManager
 	{
 		var returnVal:Dynamic = ScriptResult.Continue;
 		#if FEATURE_LUA
-		if (luaArray.length == 0)
-			return returnVal;
-
 		if (opts == null)
 			opts = {};
 		if (args == null)
@@ -123,9 +117,6 @@ class ScriptManager
 		var returnVal:Dynamic = ScriptResult.Continue;
 
 		#if FEATURE_HSCRIPT
-		if (hscriptArray.length == 0)
-			return returnVal;
-
 		if (opts == null)
 			opts = {};
 		if (args == null)

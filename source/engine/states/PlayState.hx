@@ -18,8 +18,6 @@ import openfl.utils.Assets;
 import openfl.events.KeyboardEvent;
 import cutscenes.CutsceneHandler;
 import cutscenes.DialogueBoxPsych;
-import backend.input.PreciseInputManager;
-import backend.input.PreciseInputManager.PreciseInputEvent;
 import states.editors.CharacterEditorState;
 import states.editors.ChartingState;
 import substates.PauseSubState;
@@ -664,9 +662,8 @@ class PlayState extends MusicBeatState
 
 		startCallback();
 
-		PreciseInputManager.instance.initializeKeys(keysArray);
-		PreciseInputManager.instance.onInputPressed.add(onPreciseInputPress);
-		PreciseInputManager.instance.onInputReleased.add(onPreciseInputRelease);
+		FlxG.stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyPress);
+		FlxG.stage.addEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
 
 		// PRECACHING THINGS THAT GET USED FREQUENTLY TO AVOID LAGSPIKES
 		if (ClientPrefs.data.hitsoundVolume > 0)
@@ -699,7 +696,6 @@ class PlayState extends MusicBeatState
 			if (touchPad.buttonP != null)
 				button.deadZones.push(touchPad.buttonP);
 		});
-		PreciseInputManager.instance.initializeTouchButtons(mobileControls.instance.members);
 		#end
 
 		super.create();
@@ -3314,39 +3310,34 @@ class PlayState extends MusicBeatState
 		if (ret == ScriptResult.Stop)
 			return;
 
-		// obtain notes that the player can hit but single pass instead of the old
-		var funnyNote:Note = null;
-		var doubleNote:Note = null;
-
-		for (n in notes.members)
+		// obtain notes that the player can hit
+		var plrInputNotes:Array<Note> = notes.members.filter(function(n:Note):Bool
 		{
-			if (n == null) continue;
 			var canHit:Bool = !strumsBlocked[n.noteData] && n.canBeHit && n.mustPress && !n.tooLate && !n.wasGoodHit && !n.blockHit;
-			if (!canHit || n.isSustainNote || n.noteData != key)
-				continue;
-
-			if (funnyNote == null || sortHitNotes(n, funnyNote) < 0)
-			{
-				doubleNote = funnyNote;
-				funnyNote = n;
-			}
-			else if (doubleNote == null || sortHitNotes(n, doubleNote) < 0)
-				doubleNote = n;
-		}
+			return n != null && canHit && !n.isSustainNote && n.noteData == key;
+		});
+		plrInputNotes.sort(sortHitNotes);
 
 		var shouldMiss:Bool = !ClientPrefs.data.ghostTapping;
 
-		if (funnyNote != null) // slightly faster than doing "> 0" lol
+		if (plrInputNotes.length != 0) // slightly faster than doing "> 0" lol
 		{
-			if (doubleNote != null && doubleNote.noteData == funnyNote.noteData)
+			var funnyNote:Note = plrInputNotes[0]; // front note
+
+			if (plrInputNotes.length > 1)
 			{
-				// if the note has a 0ms distance (is on top of the current note), kill it
-				if (Math.abs(doubleNote.strumTime - funnyNote.strumTime) < 1.0)
-					invalidateNote(doubleNote);
-				else if (doubleNote.strumTime < funnyNote.strumTime)
+				var doubleNote:Note = plrInputNotes[1];
+
+				if (doubleNote.noteData == funnyNote.noteData)
 				{
-					// replace the note if its ahead of time (or at least ensure "doubleNote" is ahead)
-					funnyNote = doubleNote;
+					// if the note has a 0ms distance (is on top of the current note), kill it
+					if (Math.abs(doubleNote.strumTime - funnyNote.strumTime) < 1.0)
+						invalidateNote(doubleNote);
+					else if (doubleNote.strumTime < funnyNote.strumTime)
+					{
+						// replace the note if its ahead of time (or at least ensure "doubleNote" is ahead)
+						funnyNote = doubleNote;
+					}
 				}
 			}
 			goodNoteHit(funnyNote);
@@ -3383,18 +3374,6 @@ class PlayState extends MusicBeatState
 		var key:Int = getKeyFromEvent(keysArray, eventKey);
 		if (!Funkin.controls.controllerMode && key > -1)
 			keyReleased(key);
-	}
-
-	private function onPreciseInputPress(event:PreciseInputEvent):Void
-	{
-		if (!Funkin.controls.controllerMode)
-			keyPressed(event.noteData);
-	}
-
-	private function onPreciseInputRelease(event:PreciseInputEvent):Void
-	{
-		if (!Funkin.controls.controllerMode)
-			keyReleased(event.noteData);
 	}
 
 	private function keyReleased(key:Int)
@@ -4009,9 +3988,8 @@ class PlayState extends MusicBeatState
 	{
 		instance = null;
 
-		PreciseInputManager.instance.onInputPressed.remove(onPreciseInputPress);
-		PreciseInputManager.instance.onInputReleased.remove(onPreciseInputRelease);
-		PreciseInputManager.instance.destroy();
+		FlxG.stage.removeEventListener(KeyboardEvent.KEY_DOWN, onKeyPress);
+		FlxG.stage.removeEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
 
 		FlxG.animationTimeScale = 1;
 
