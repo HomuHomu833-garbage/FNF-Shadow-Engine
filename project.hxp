@@ -20,7 +20,7 @@ class Project extends HXProject
 	static final TITLE_IOS:String = "FNF Shadow Engine";
 	static final EXECUTABLE:String = "ShadowEngine";
 	static final VERSION:String = "0.10.0";
-	static final BUILD_NUMBER:Int = 1000;
+	static final BUILD_NUMBER:Int = 1071;
 	static final COMPANY:String = "ShadowEngineTeam";
 	static final PACKAGE:String = "org.shadowengineteam.fnf";
 	static final MAIN_CLASS:String = "backend.Main";
@@ -347,7 +347,6 @@ class Project extends HXProject
 
 		// see https://haxe.org/manual/cr-static-analyzer.html
 		// setHaxedef("analyzer-optimize");
-
 
 		if (isMobile() || isWeb())
 			setHaxedef("TOUCH_HERE_TO_PLAY");

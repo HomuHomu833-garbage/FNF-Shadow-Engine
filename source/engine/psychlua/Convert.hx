@@ -155,7 +155,7 @@ class Convert
 				final i64:haxe.Int64 = Lua.tointeger64(l, idx, cpp.Pointer.addressOf(isInteger).raw);
 				ret = i64.high * 4294967296.0 + ((i64.low < 0) ? i64.low + 4294967296.0 : i64.low);
 			case type if (type == Lua.TVECTOR):
-				final vec:cpp.RawConstPointer<Single> = Lua.tovector(l, idx);
+				final vec:cpp.RawConstPointer<Lua_VectorType> = Lua.tovector(l, idx);
 				if (vec != null)
 					ret = {x: (vec[0] : Float), y: (vec[1] : Float), z: (vec[2] : Float)};
 				else

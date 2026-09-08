@@ -3,7 +3,7 @@
     {
       "name": "lime",
       "type": "git",
-      "ref": "872213b62566cef0a8b4bfe4dad42c86ef1579bb",
+      "ref": "0a53245185f3c72971bb34c870c05a7ef439fd1b",
       "url": "https://github.com/ShadowEngineTeam/lime"
     },
     {
@@ -57,7 +57,7 @@
     {
       "name": "format",
       "type": "git",
-      "ref": "2cc9cb1a565ac389bdff3a3cc9987a6db82ef84b",
+      "ref": "775a06f0a7aa64cbd060b5c3ba62f65d7fed684a",
       "url": "https://github.com/HaxeFoundation/format"
     },
     {
