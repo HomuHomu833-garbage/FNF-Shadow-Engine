@@ -74,7 +74,8 @@ class Project extends HXProject
 		configureAssets();
 		configureLibs();
 		configureIcons();
-		if (!isDisplay()) checkLibraries();
+		if (!isDisplay())
+			checkLibraries();
 		trace("Configured project successfully!");
 		trace("Starting build...");
 		trace("");
@@ -245,7 +246,7 @@ class Project extends HXProject
 
 		setHaxedef("message.reporting", "pretty");
 		setHaxedef("lime_disable_assets_version");
-		setHaxedef("openfl_pool_events"); //https://github.com/FunkinCrew/Funkin/pull/7898
+		setHaxedef("openfl_pool_events"); // https://github.com/FunkinCrew/Funkin/pull/7898
 
 		setHaxedef("HXCPP_CHECK_POINTER");
 		setHaxedef("HXCPP_STACK_LINE");
@@ -420,7 +421,7 @@ class Project extends HXProject
 		if (FEATURE_DISCORD_RPC.isEnabled())
 			includeHaxelib("hxdiscord_rpc");
 
-		if(FEATURE_HAPTICS.isEnabled())
+		if (FEATURE_HAPTICS.isEnabled())
 			includeHaxelib("extension-haptics");
 
 		//if (FEATURE_FUNKIN_CONTENT.isEnabled())
