@@ -98,16 +98,16 @@ jobs:
         run: |
           case "${{ inputs.name }}" in
             "Linux ARMV7")
-              CC="clang-22 --target=arm-linux-gnueabihf" CXX="clang++-22 --target=arm-linux-gnueabihf" linux32 haxelib run lime build ${{ inputs.buildArgs }} -D ${{ inputs.assetType }}
+              CC="clang-22 --target=arm-linux-gnueabihf" CXX="clang++-22 --target=arm-linux-gnueabihf" linux32 haxelib run lime build ${{ inputs.buildArgs }} -D ${{ inputs.assetType }} -D NO_FEATURE_FUNKIN_CONTENT
               ;;
             "Linux i686")
-              CC="clang-22 --target=i686-linux-gnu" CXX="clang++-22 --target=i686-linux-gnu" linux32 haxelib run lime build ${{ inputs.buildArgs }} -D ${{ inputs.assetType }}
+              CC="clang-22 --target=i686-linux-gnu" CXX="clang++-22 --target=i686-linux-gnu" linux32 haxelib run lime build ${{ inputs.buildArgs }} -D ${{ inputs.assetType }} -D NO_FEATURE_FUNKIN_CONTENT
               ;;
             "Linux x86_64"|"Linux ARM64")
-              CC="clang-22" CXX="clang++-22" haxelib run lime build ${{ inputs.buildArgs }} -D ${{ inputs.assetType }}
+              CC="clang-22" CXX="clang++-22" haxelib run lime build ${{ inputs.buildArgs }} -D ${{ inputs.assetType }} -D NO_FEATURE_FUNKIN_CONTENT
               ;;
             *)
-              haxelib run lime build ${{ inputs.buildArgs }} -D ${{ inputs.assetType }}
+              haxelib run lime build ${{ inputs.buildArgs }} -D ${{ inputs.assetType }} -D NO_FEATURE_FUNKIN_CONTENT
               ;;
           esac
 
