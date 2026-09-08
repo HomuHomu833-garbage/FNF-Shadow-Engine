@@ -91,6 +91,11 @@
       "url": "https://github.com/ShadowEngineTeam/flixel-animate"
     },
     {
+      "name": "extension-haptics",
+      "type": "haxelib",
+      "version": "1.0.4"
+    },
+    {
       "name": "tink_core",
       "type": "haxelib",
       "version": "1.26.0"

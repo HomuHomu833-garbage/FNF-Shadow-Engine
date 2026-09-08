@@ -1,7 +1,4 @@
 package options;
-
-//import lime.ui.Haptic;
-
 class GameplaySettingsSubState extends BaseOptionsMenu
 {
 	#if mobile
@@ -34,7 +31,7 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 
 		var option:Option = new Option('Auto Pause', "If checked, the game automatically pauses if the screen isn't on focus.", 'autoPause', 'bool');
 		addOption(option);
-		option.onChange = onChangeAutoPause;
+		option.onChange = () -> FlxG.autoPause = ClientPrefs.data.autoPause;
 
 		var option:Option = new Option('Pop Up Score',
 			"If unchecked, hitting notes won't make \"sick\", \"good\".. and combo popups (Useful for low end " + platform + ").", 'popUpRating', 'bool');
@@ -43,9 +40,15 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		var option:Option = new Option('Disable Reset Button', "If checked, pressing Reset won't do anything.", 'noReset', 'bool');
 		addOption(option);
 
-		/*var option:Option = new Option('Game Over Vibration', "If checked, your device will vibrate at game over.", 'gameOverVibration', 'bool');
+		#if FEATURE_HAPTICS
+		var option:Option = new Option('Game Over Vibration', "If checked, your device will vibrate at game over.", 'gameOverVibration', 'bool');
 		addOption(option);
-		option.onChange = onChangeVibration;*/
+		option.onChange = () ->
+		{
+			if (ClientPrefs.data.gameOverVibration)
+				extension.haptics.Haptic.vibrateOneShot(0.5, 1, 1);
+		};
+		#end
 
 		var option:Option = new Option('Hitsound Volume', 'Funny notes does \"Tick!\" when you hit them.', 'hitsoundVolume', 'percent');
 		addOption(option);
@@ -54,10 +57,9 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 		option.maxValue = 1;
 		option.changeValue = 0.1;
 		option.decimals = 1;
-		option.onChange = onChangeHitsoundVolume;
+		option.onChange = () -> FlxG.sound.play(Paths.sound('hitsound'), ClientPrefs.data.hitsoundVolume);
 
-		var option:Option = new Option('Rating Offset', 'Changes how late/early you have to hit for a "Sick!"\nHigher values mean you have to hit later.',
-			'ratingOffset', 'int');
+		var option:Option = new Option('Rating Offset', 'Changes how late/early you have to hit for a "Sick!"\nHigher values mean you have to hit later.', 'ratingOffset', 'int');
 		option.displayFormat = '%vms';
 		option.scrollSpeed = 20;
 		option.minValue = -30;
@@ -99,20 +101,4 @@ class GameplaySettingsSubState extends BaseOptionsMenu
 
 		super();
 	}
-
-	function onChangeHitsoundVolume()
-		FlxG.sound.play(Paths.sound('hitsound'), ClientPrefs.data.hitsoundVolume);
-
-	function onChangeAutoPause()
-	{
-		FlxG.autoPause = ClientPrefs.data.autoPause;
-	}
-
-	/*function onChangeVibration()
-	{
-		if (ClientPrefs.data.gameOverVibration)
-		{
-			Haptic.vibrate(0, 500);
-		}
-	}*/
 }

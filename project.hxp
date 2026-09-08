@@ -40,6 +40,7 @@ class Project extends HXProject
 	static final FEATURE_FUNKIN_CONTENT:CompileFlag = CompileFlag.get("FEATURE_FUNKIN_CONTENT");
 	static final FEATURE_EMBED_ASSETS:CompileFlag = CompileFlag.get("EMBED_ASSETS");
 	static final USE_OPENFL_FILESYSTEM:CompileFlag = CompileFlag.get("USE_OPENFL_FILESYSTEM");
+	static final FEATURE_HAPTICS:CompileFlag = CompileFlag.get("FEATURE_HAPTICS");
 
 	static final ENABLE_ASCII_ART:Bool = true;
 
@@ -64,11 +65,7 @@ class Project extends HXProject
 		};
 
 		if (Sys.systemName().toLowerCase() != "windows" && Sys.getEnv('TERM') == null && Sys.getEnv('TERM') != "dumb")
-		{
-			COLOR_RESET = "";
-			COLOR_WARNING = "";
-			COLOR_ERROR = "";
-		}
+			COLOR_RESET = COLOR_WARNING = COLOR_ERROR = "";
 
 		trace("Configuring project...");
 		doWelcomeHeader();
@@ -77,8 +74,7 @@ class Project extends HXProject
 		configureAssets();
 		configureLibs();
 		configureIcons();
-		if (!isDisplay())
-			checkLibraries();
+		if (!isDisplay()) checkLibraries();
 		trace("Configured project successfully!");
 		trace("Starting build...");
 		trace("");
@@ -228,7 +224,7 @@ class Project extends HXProject
 	{
 		FEATURE_MODS.integrate(isDesktop() || isMobile());
 		FEATURE_HSCRIPT.integrate(true);
-		FEATURE_LUA.integrate(isDesktop() || isMobile());
+		// FEATURE_LUA.integrate(isDesktop() || isMobile());
 		FEATURE_VIDEOS.integrate(isDesktop() || isMobile());
 		FEATURE_DISCORD_RPC.integrate(isDesktop());
 		FEATURE_MOBILE_CONTROLS.integrate(isMobile());
@@ -236,6 +232,7 @@ class Project extends HXProject
 		FEATURE_TRACY.integrate(false);
 		FEATURE_FUNKIN_CONTENT.integrate(true);
 		FEATURE_EMBED_ASSETS.integrate(false);
+		FEATURE_HAPTICS.integrate(isMobile());
 
 		if (FEATURE_FUNKIN_CONTENT.isEnabled())
 			FEATURE_HSCRIPT.integrate(true);
@@ -248,7 +245,7 @@ class Project extends HXProject
 
 		setHaxedef("message.reporting", "pretty");
 		setHaxedef("lime_disable_assets_version");
-		setHaxedef("openfl_pool_events");
+		setHaxedef("openfl_pool_events"); //https://github.com/FunkinCrew/Funkin/pull/7898
 
 		setHaxedef("HXCPP_CHECK_POINTER");
 		setHaxedef("HXCPP_STACK_LINE");
@@ -422,6 +419,10 @@ class Project extends HXProject
 		}
 		if (FEATURE_DISCORD_RPC.isEnabled())
 			includeHaxelib("hxdiscord_rpc");
+
+		if(FEATURE_HAPTICS.isEnabled())
+			includeHaxelib("extension-haptics");
+
 		//if (FEATURE_FUNKIN_CONTENT.isEnabled())
 		//{
 			includeHaxelib("funkin.vis");
@@ -776,11 +777,10 @@ class CompileFlag
 {
 	public static final INVERSION:String = "NO_";
 	public static var project:Project;
+	var name:String;
 
 	public static function get(name:String):CompileFlag
 		return new CompileFlag(name);
-
-	var name:String;
 
 	public function new(name:String)
 		this.name = name;
