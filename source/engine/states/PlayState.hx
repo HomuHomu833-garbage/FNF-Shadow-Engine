@@ -109,7 +109,6 @@ class PlayState extends MusicBeatState
 
 	public var spawnTime:Float = 2000;
 
-	public var inst:FlxSound;
 	public var vocals:FlxSound;
 	public var opponentVocals:FlxSound;
 
@@ -142,8 +141,6 @@ class PlayState extends MusicBeatState
 	public var camZoomingMult:Float = 1;
 	public var camZoomingFrequency:Float = 4;
 	public var camZoomingDecay:Float = 1;
-
-	private var curSong:String = "";
 
 	public var gfSpeed:Int = 1;
 	public var health(default, set):Float = 1;
@@ -308,9 +305,46 @@ class PlayState extends MusicBeatState
 	// from gacha horror recreation
 	public var characterPlayingAsDad:Bool = false;
 
+	var dialogueCount:Int = 0;
+
+	public var psychDialogue:DialogueBoxPsych;
+
+	var startTimer:FlxTimer;
+	var finishTimer:FlxTimer = null;
+
+	public var countdownReady:FlxSprite;
+	public var countdownSet:FlxSprite;
+	public var countdownGo:FlxSprite;
+
+	public static var startOnTime:Float = 0;
+
+	var debugNum:Int = 0;
+	var noteTypes:Array<String> = [];
+	var eventsPushed:Array<String> = [];
+	public var totalPlayed:Int = 0;
+	public var totalNotesHit:Float = 0.0;
+
+	public var showCombo:Bool = false;
+	public var showComboNum:Bool = true;
+	public var showRating:Bool = true;
+	public var noteTimingRating:FlxText;
+	public var noteTimingRatingTween:FlxTween;
+	public var comboGroup:FlxTypedGroup<Combo>;
+	public var uiGroup:FlxSpriteGroup;
+	public var noteGroup:FlxTypedGroup<FlxBasic>;
+
+	var _lastSongScore:Int = -1;
+	var _lastSongMisses:Int = -1;
+	var _lastSongHits:Int = -1;
+	var _lastCombo:Int = -1;
+	var _lastTotalPlayed:Int = -1;
+	var _lastTotalNotesHit:Float = -1;
+	var _lastSecondsTotal:Int = -1;
+	var _lastCpuControlled:Null<Bool> = null;
+	public var transitioning:Bool = false;
+
 	override public function create():Void
 	{
-		// trace('Playback Rate: ' + playbackRate);
 		Paths.clearStoredMemory();
 
 		Note.clearPool();
@@ -318,10 +352,9 @@ class PlayState extends MusicBeatState
 		startCallback = startCountdown;
 		endCallback = endSong;
 
-		// for lua
 		instance = this;
 
-		PauseSubState.songName = null; // Reset to default
+		PauseSubState.songName = null;
 		playbackRate = ClientPrefs.getGameplaySetting('songspeed');
 		characterPlayingAsDad = ClientPrefs.getGameplaySetting('playAsOpponent');
 
@@ -496,7 +529,16 @@ class PlayState extends MusicBeatState
 
 		stagesFunc((stage:BaseStage) -> stage.createPost());
 
-		add(comboGroup = new FlxSpriteGroup());
+		add(comboGroup = new FlxTypedGroup<Combo>());
+
+		if(ClientPrefs.data.showNoteTiming)
+		{
+			add(noteTimingRating = new FlxText(0, 0, 0, "0ms"));
+			noteTimingRating.setFormat(Paths.font("vcr.ttf"), 20, FlxColor.WHITE, CENTER, OUTLINE, FlxColor.BLACK);
+			noteTimingRating.cameras = [camHUD];
+			noteTimingRating.exists = false;
+		}
+
 		add(uiGroup = new FlxSpriteGroup());
 		add(noteGroup = new FlxTypedGroup<FlxBasic>());
 
@@ -582,14 +624,7 @@ class PlayState extends MusicBeatState
 		iconP2.alpha = ClientPrefs.data.healthBarAlpha;
 
 		uiGroup.add(scoreTxt = new FlxText(0, healthBar.y + 40, FlxG.width, "", 20));
-		// `scoreTxt` is the most frequently re-rasterised object in the game: its string changes on
-		// every note hit, and each change re-runs FlxText.regenGraphic() over a full-width
-		// (FlxG.width x ~55px) surface and re-uploads it to the GPU.
-		//
-		// FlxText's OUTLINE border draws the whole text field 8 extra times; OUTLINE_FAST does it 4.
-		// At borderSize 1.25 on VCR the two are visually near-identical, so mobile takes the cheap
-		// one - that's roughly a 45% cut off every note press. Desktop keeps the original look.
-		scoreTxt.setFormat(Paths.font("vcr.ttf"), 20, FlxColor.WHITE, CENTER, #if mobile OUTLINE_FAST #else OUTLINE #end, FlxColor.BLACK);
+		scoreTxt.setFormat(Paths.font("vcr.ttf"), 20, FlxColor.WHITE, CENTER, OUTLINE, FlxColor.BLACK);
 		scoreTxt.scrollFactor.set();
 		scoreTxt.borderSize = 1.25;
 		scoreTxt.visible = !ClientPrefs.data.hideHud && !cpuControlled;
@@ -666,6 +701,7 @@ class PlayState extends MusicBeatState
 		FlxG.stage.addEventListener(KeyboardEvent.KEY_UP, onKeyRelease);
 
 		// PRECACHING THINGS THAT GET USED FREQUENTLY TO AVOID LAGSPIKES
+		// bro maybe do this shit in loading state?
 		if (ClientPrefs.data.hitsoundVolume > 0)
 			Paths.sound('hitsound');
 
@@ -682,7 +718,6 @@ class PlayState extends MusicBeatState
 		resetRPC();
 
 		cacheCountdown();
-		cachePopUpScore();
 
 		#if FEATURE_MOBILE_CONTROLS
 		addMobileControls(false);
@@ -709,7 +744,7 @@ class PlayState extends MusicBeatState
 	{
 		if (generatedMusic)
 		{
-			final ratio:Float = value / songSpeed; // funny word huh
+			final ratio:Float = value / songSpeed;
 			if (ratio != 1)
 			{
 				for (note in notes.members)
@@ -730,8 +765,7 @@ class PlayState extends MusicBeatState
 		{
 			vocals.pitch = value;
 
-			@:privateAccess
-			if (opponentVocals._sound != null)
+			if (opponentVocals != null)
 				opponentVocals.pitch = value;
 
 			FlxG.sound.music.pitch = value;
@@ -742,7 +776,7 @@ class PlayState extends MusicBeatState
 					intro.pitch = value;
 			}
 
-			final ratio:Float = playbackRate / value; // funny word huh
+			final ratio:Float = playbackRate / value;
 			if (ratio != 1)
 			{
 				for (note in notes.members)
@@ -853,11 +887,7 @@ class PlayState extends MusicBeatState
 			{
 				function onVideoEnd():Void
 				{
-					if (!isDead
-						&& generatedMusic
-						&& PlayState.SONG.notes[Std.int(curStep / 16)] != null
-						&& !endingSong
-						&& !isCameraOnForcedPos)
+					if (!isDead && generatedMusic && PlayState.SONG.notes[Std.int(curStep / 16)] != null && !endingSong && !isCameraOnForcedPos)
 					{
 						moveCameraSection();
 						FlxG.camera.snapToTarget();
@@ -891,13 +921,9 @@ class PlayState extends MusicBeatState
 		return null;
 	}
 
-	function startAndEnd():Void
+	inline function startAndEnd():Void
 		endingSong ? endSong() : startCountdown();
 
-	var dialogueCount:Int = 0;
-	public var psychDialogue:DialogueBoxPsych;
-
-	// You don't have to add a song, just saying. You can just do "startDialogue(DialogueBoxPsych.parseDialogue(Paths.json(songName + '/dialogue')))" and it should load dialogue.json
 	public function startDialogue(dialogueFile:DialogueFile, ?song:String = null):Void
 	{
 		// TO DO: Make this more flexible, maybe?
@@ -912,7 +938,7 @@ class PlayState extends MusicBeatState
 			psychDialogue.finishThing = () ->
 			{
 				psychDialogue = null;
-				endingSong ? endSong() : startCountdown();
+				startAndEnd();
 			}
 			psychDialogue.nextDialogueThing = startNextDialogue;
 			psychDialogue.skipDialogueThing = skipDialogue;
@@ -924,16 +950,6 @@ class PlayState extends MusicBeatState
 			startAndEnd();
 		}
 	}
-
-	var startTimer:FlxTimer;
-	var finishTimer:FlxTimer = null;
-
-	// For being able to mess with the sprites on Lua
-	public var countdownReady:FlxSprite;
-	public var countdownSet:FlxSprite;
-	public var countdownGo:FlxSprite;
-
-	public static var startOnTime:Float = 0;
 
 	function cacheCountdown():Void
 	{
@@ -1075,7 +1091,7 @@ class PlayState extends MusicBeatState
 		return true;
 	}
 
-	function getIntroAssets():Array<String>
+	inline function getIntroAssets():Array<String>
 	{
 		switch (stageUI)
 		{
@@ -1126,8 +1142,7 @@ class PlayState extends MusicBeatState
 			final daNote:Note = unspawnNotes[i];
 			if (daNote.strumTime - 350 < time)
 			{
-				daNote.active = false;
-				daNote.visible = false;
+				daNote.active = daNote.visible = false;
 				daNote.ignoreNote = true;
 
 				if (!ClientPrefs.data.lowQuality || !ClientPrefs.data.popUpRating || !cpuControlled)
@@ -1145,8 +1160,7 @@ class PlayState extends MusicBeatState
 			final daNote:Note = notes.members[i];
 			if (daNote.strumTime - 350 < time)
 			{
-				daNote.active = false;
-				daNote.visible = false;
+				daNote.active = daNote.visible = false;
 				daNote.ignoreNote = true;
 				invalidateNote(daNote);
 			}
@@ -1216,8 +1230,7 @@ class PlayState extends MusicBeatState
 		FlxG.sound.music.pause();
 		vocals.pause();
 
-		@:privateAccess
-		if (opponentVocals._sound != null)
+		if (opponentVocals != null)
 			opponentVocals.pause();
 
 		FlxG.sound.music.time = time;
@@ -1228,22 +1241,17 @@ class PlayState extends MusicBeatState
 		{
 			vocals.time = time;
 
-			@:privateAccess
-			if (opponentVocals._sound != null)
+			if (opponentVocals != null)
 				opponentVocals.time = time;
 
 			vocals.pitch = playbackRate;
 
-			@:privateAccess
-			if (opponentVocals._sound != null)
+			if (opponentVocals != null)
 				opponentVocals.pitch = playbackRate;
 		}
 
 		vocals.play();
-
-		@:privateAccess
-		if (opponentVocals._sound != null)
-			opponentVocals.play();
+		opponentVocals?.play();
 
 		Conductor.songPosition = time;
 	}
@@ -1261,28 +1269,22 @@ class PlayState extends MusicBeatState
 	{
 		startingSong = false;
 
-		@:privateAccess
-		FlxG.sound.playMusic(inst._sound, 1, false);
+		FlxG.sound.playMusic(Paths.inst(SONG.song, Difficulty.getSongPrefix(null, false)), 1, false);
 		FlxG.sound.music.pitch = playbackRate;
 		FlxG.sound.music.onComplete = () -> finishSong();
-		vocals.play();
 
-		@:privateAccess
-		if (opponentVocals._sound != null)
-			opponentVocals.play();
+		vocals.play();
+		opponentVocals?.play();
 
 		setSongTime(Math.max(0, startOnTime - 500));
 		startOnTime = 0;
 
 		if (paused)
 		{
-			// trace('Oopsie doopsie! Paused sound');
 			FlxG.sound.music.pause();
-			vocals.pause();
 
-			@:privateAccess
-			if (opponentVocals._sound != null)
-				opponentVocals.pause();
+			vocals.pause();
+			opponentVocals?.pause();
 		}
 
 		// Song duration in a float, useful for the time left feature
@@ -1304,13 +1306,8 @@ class PlayState extends MusicBeatState
 		#end
 	}
 
-	var debugNum:Int = 0;
-	private var noteTypes:Array<String> = [];
-	private var eventsPushed:Array<String> = [];
-
-	private function generateSong(dataPath:String):Void
+	function generateSong(dataPath:String):Void
 	{
-		// FlxG.log.add(ChartParser.parse());
 		songSpeed = PlayState.SONG.speed;
 		songSpeedType = ClientPrefs.getGameplaySetting('scrolltype');
 		switch (songSpeedType)
@@ -1321,74 +1318,45 @@ class PlayState extends MusicBeatState
 				songSpeed = ClientPrefs.getGameplaySetting('scrollspeed');
 		}
 
-		var songData = SONG;
-		Conductor.bpm = songData.bpm;
-
-		curSong = songData.song;
+		Conductor.bpm = SONG.bpm;
 
 		vocals = new FlxSound();
 		opponentVocals = new FlxSound();
 		try
 		{
-			if (songData.needsVoices)
+			if (SONG.needsVoices)
 			{
-				var playerVocals = Paths.voices(curSong, boyfriend.vocalsFile + Difficulty.getSongPrefix());
-				if (playerVocals == null)
-					playerVocals = Paths.voices(curSong, 'Player' + Difficulty.getSongPrefix());
-				vocals.loadEmbedded(playerVocals ?? Paths.voices(curSong, Difficulty.getSongPrefix(null, false)));
+				final playerVocals = Paths.voices(SONG.song, boyfriend.vocalsFile + Difficulty.getSongPrefix()) ?? Paths.voices(SONG.song, 'Player' + Difficulty.getSongPrefix());
+				vocals.loadEmbedded(playerVocals ?? Paths.voices(SONG.song, Difficulty.getSongPrefix(null, false)));
+				vocals.pitch = playbackRate;
 
-				var oppVocals = Paths.voices(curSong, dad.vocalsFile + Difficulty.getSongPrefix());
-				if (oppVocals == null)
-					oppVocals = Paths.voices(curSong, 'Opponent' + Difficulty.getSongPrefix());
-				if (oppVocals != null)
+				final oppVocals = Paths.voices(SONG.song, dad.vocalsFile + Difficulty.getSongPrefix()) ?? Paths.voices(SONG.song, 'Opponent' + Difficulty.getSongPrefix());
+				if (oppVocals != null) {
 					opponentVocals.loadEmbedded(oppVocals);
+					opponentVocals.pitch = playbackRate;
+				}
 			}
 		}
-		catch (e:Dynamic)
-		{
-		}
+		catch (e:Dynamic) {}
 
-		vocals.pitch = playbackRate;
-		@:privateAccess
-		if (opponentVocals._sound != null)
-			opponentVocals.pitch = playbackRate;
-		FlxG.sound.list.add(vocals);
-		@:privateAccess
-		if (opponentVocals._sound != null)
-			FlxG.sound.list.add(opponentVocals);
-
-		inst = new FlxSound();
-		try
-		{
-			inst.loadEmbedded(Paths.inst(songData.song, Difficulty.getSongPrefix(null, false)));
-		}
-		catch (e:Dynamic)
-		{
-		}
-		FlxG.sound.list.add(inst);
-
-		notes = new FlxTypedGroup<Note>();
-		noteGroup.add(notes);
-
-		var noteData:Array<SwagSection>;
-
-		// NEW SHIT
-		noteData = songData.notes;
+		noteGroup.add(notes = new FlxTypedGroup<Note>());
 
 		isErect = Difficulty.list[storyDifficulty] == ERECT || Difficulty.list[storyDifficulty] == NIGHTMARE;
-		var file:String = Paths.json(songName + '/events' + (isErect ? '-erect' : ""));
 
-		if (#if FEATURE_MODS FileSystem.exists(Paths.modsJson(songName + '/events' + (isErect ? '-erect' : ""))) || #end FileSystem.exists(file))
+		final file:String = 'events${isErect ? '-erect' : ''}';
+		if (#if FEATURE_MODS FileSystem.exists(Paths.modsJson('$songName/$file')) || #end FileSystem.exists(Paths.json('$songName/$file')))
 		{
-			var eventsData:Array<Dynamic> = Song.loadFromJson('events' + (isErect ? '-erect' : ""), songName).events;
-			for (event in eventsData) // Event Notes
+			final eventsData:Array<Dynamic> = Song.loadFromJson(file, songName).events;
+			for (event in eventsData)
+			{
 				for (i in 0...event[1].length)
 					makeEvent(event, i);
+			}
 		}
 
-		final isPsychRelease:Bool = songData.format == 'psych_v1';
+		final isPsychRelease:Bool = SONG.format == 'psych_v1';
 
-		for (section in noteData)
+		for (section in SONG.notes)
 		{
 			for (songNotes in section.sectionNotes)
 			{
@@ -1411,11 +1379,7 @@ class PlayState extends MusicBeatState
 				if (characterPlayingAsDad)
 					gottaHitNote = !gottaHitNote;
 
-				var oldNote:Note;
-				if (unspawnNotes.length > 0)
-					oldNote = unspawnNotes[Std.int(unspawnNotes.length - 1)];
-				else
-					oldNote = null;
+				var oldNote:Note = unspawnNotes.length > 0  ? unspawnNotes[Std.int(unspawnNotes.length - 1)] : null;
 
 				var swagNote:Note = Note.getNote(daStrumTime, daNoteData, oldNote);
 				swagNote.mustPress = gottaHitNote;
@@ -1500,7 +1464,7 @@ class PlayState extends MusicBeatState
 				}
 			}
 		}
-		for (event in songData.events) // Event Notes
+		for (event in SONG.events) // Event Notes
 			for (i in 0...event[1].length)
 				makeEvent(event, i);
 
@@ -1512,11 +1476,7 @@ class PlayState extends MusicBeatState
 	function eventPushed(event:EventNote)
 	{
 		eventPushedUnique(event);
-		if (eventsPushed.contains(event.event))
-		{
-			return;
-		}
-
+		if (eventsPushed.contains(event.event)) return;
 		stagesFunc(function(stage:BaseStage) stage.eventPushed(event));
 		eventsPushed.push(event.event);
 	}
@@ -1873,11 +1833,7 @@ class PlayState extends MusicBeatState
 
 		if (!inCutscene && !paused && !freezeCamera)
 		{
-			if (zoomTween != null)
-				FlxG.camera.zoom = defaultCamZoom; // tween already eased it, don't lerp again
-			else
-				FlxG.camera.zoom = FlxMath.lerp(defaultCamZoom, FlxG.camera.zoom, Math.exp(-elapsed * 3.125 * camZoomingDecay * playbackRate));
-
+			FlxG.camera.zoom = zoomTween != null ? defaultCamZoom : FlxMath.lerp(defaultCamZoom, FlxG.camera.zoom, Math.exp(-elapsed * 3.125 * camZoomingDecay * playbackRate));
 			camHUD.zoom = FlxMath.lerp(1, camHUD.zoom, Math.exp(-elapsed * 3.125 * camZoomingDecay * playbackRate));
 		}
 
@@ -1885,12 +1841,9 @@ class PlayState extends MusicBeatState
 		FlxG.watch.addQuick("beatShit", curBeat);
 		FlxG.watch.addQuick("stepShit", curStep);
 
-		// RESET = Quick Game Over Screen
 		if (!ClientPrefs.data.noReset && Funkin.controls.RESET && canReset && !inCutscene && startedCountdown && !endingSong)
-		{
 			health = 0;
-			trace("Pressed RESET key, go kaboom");
-		}
+
 		doDeathCheck();
 
 		if (unspawnNotes[0] != null)
@@ -2029,6 +1982,22 @@ class PlayState extends MusicBeatState
 		}
 		#end
 
+		if(!ClientPrefs.data.hideHud)
+		{
+			for (s in comboGroup.members)
+			{
+				s.lifeTime -= elapsed * playbackRate;
+
+				if (s.lifeTime <= 0)
+				{
+					s.alpha -= elapsed * 6 * playbackRate;
+
+					if (s.alpha <= 0)
+						s.kill();
+				}
+			}
+		}
+
 		if (hasScripts)
 		{
 			setOnScripts('cameraX', camFollow.x);
@@ -2141,9 +2110,7 @@ class PlayState extends MusicBeatState
 		{
 			FlxG.sound.music.pause();
 			vocals.pause();
-			@:privateAccess
-			if (opponentVocals._sound != null)
-				opponentVocals.pause();
+			opponentVocals?.pause();
 		}
 		if (!cpuControlled)
 		{
@@ -2167,8 +2134,7 @@ class PlayState extends MusicBeatState
 		FlxG.camera.followLerp = 0;
 		persistentUpdate = false;
 		paused = true;
-		if (FlxG.sound.music != null)
-			FlxG.sound.music.stop();
+		FlxG.sound.music?.stop();
 		chartingMode = true;
 
 		#if FEATURE_DISCORD_RPC
@@ -2693,8 +2659,8 @@ class PlayState extends MusicBeatState
 
 	function moveCameraSection(?sec:Null<Int>):Void
 	{
-		if (sec == null)
-			sec = curSection;
+		sec ??= curSection;
+
 		if (sec < 0)
 			sec = 0;
 
@@ -2740,8 +2706,8 @@ class PlayState extends MusicBeatState
 
 		vocals.volume = 0;
 		vocals.pause();
-		@:privateAccess
-		if (opponentVocals._sound != null)
+
+		if (opponentVocals != null)
 		{
 			opponentVocals.volume = 0;
 			opponentVocals.pause();
@@ -2750,10 +2716,7 @@ class PlayState extends MusicBeatState
 		if (ClientPrefs.data.noteOffset <= 0 || ignoreNoteOffset)
 			endCallback();
 		else
-			finishTimer = new FlxTimer().start(ClientPrefs.data.noteOffset / 1000, function(tmr:FlxTimer)
-			{
-				endCallback();
-			});
+			finishTimer = new FlxTimer().start(ClientPrefs.data.noteOffset / 1000, (_) -> endCallback());
 	}
 
 	public function showResults():Void
@@ -2763,8 +2726,6 @@ class PlayState extends MusicBeatState
 		paused = true;
 		switchSubState(ResultsScreen);
 	}
-
-	public var transitioning = false;
 
 	public function endSong()
 	{
@@ -2896,183 +2857,41 @@ class PlayState extends MusicBeatState
 		while (notes.length > 0)
 		{
 			var daNote:Note = notes.members[0];
-			daNote.active = false;
-			daNote.visible = false;
+			daNote.active = daNote.visible = false;
 			invalidateNote(daNote);
 		}
 		unspawnNotes = [];
 		eventNotes = [];
 	}
 
-	public var totalPlayed:Int = 0;
-	public var totalNotesHit:Float = 0.0;
-
-	public var showCombo:Bool = false;
-	public var showComboNum:Bool = true;
-	public var showRating:Bool = true;
-	public var noteTimingRating:FlxText;
-	public var noteTimingRatingTween:FlxTween;
-
-	// Stores Ratings and Combo Sprites in a group
-	public var comboGroup:FlxSpriteGroup;
-	// Stores HUD Objects in a Group
-	public var uiGroup:FlxSpriteGroup;
-	// Stores Note Objects in a Group
-	public var noteGroup:FlxTypedGroup<FlxBasic>;
-	// Stores The Cached PopUpRating Sprites As String
-	public var ratingsCache:Map<String, FlxSprite> = new Map<String, FlxSprite>();
-
-	/** Reused scratch buffer for splitting the combo into digits, see popUpScore(). */
-	final _comboDigits:Array<Int> = [];
-
-	// Last values `recalculateRating()` was run against, see update(). Seeded to impossible values so
-	// the first frame always recalculates.
-	var _lastSongScore:Int = -1;
-	var _lastSongMisses:Int = -1;
-	var _lastSongHits:Int = -1;
-	var _lastCombo:Int = -1;
-	var _lastTotalPlayed:Int = -1;
-	var _lastTotalNotesHit:Float = -1;
-	var _lastSecondsTotal:Int = -1;
-	var _lastCpuControlled:Null<Bool> = null;
-
-	private function cachePopUpScore()
+	function popUpScore(?note:Note):Void
 	{
-		var uiPrefix:String = '';
-		var uiSuffix:String = '';
-		if (stageUI != "normal")
+		final noteDiffNoAbs:Float = note.strumTime - Conductor.songPosition + ClientPrefs.data.ratingOffset;
+		final noteDiff:Float = Math.abs(noteDiffNoAbs);
+
+		final daRating:Rating = switch (Rating.judgeNote(noteDiff))
 		{
-			uiPrefix = '${stageUI}UI/';
-			if (PlayState.isPixelStage)
-				uiSuffix = '-pixel';
+			case 'sick': ratingsData[0];
+			case 'good': ratingsData[1];
+			case 'bad': ratingsData[2];
+			case 'shit': ratingsData[3];
+			default: ratingsData[3];
 		}
-
-		for (rating in ratingsData)
-		{
-			var ratingImage:String = uiPrefix + rating.image + uiSuffix;
-			var leRating = new FlxSprite().loadGraphic(Paths.image(ratingImage));
-			ratingsCache.set(ratingImage, leRating);
-		}
-
-		for (ratingNum in 0...10)
-		{
-			var ratingImage:String = uiPrefix + 'num' + ratingNum + uiSuffix;
-			var leRating = new FlxSprite().loadGraphic(Paths.image(ratingImage));
-			ratingsCache.set(ratingImage, leRating);
-		}
-
-		// The combo sprite used to go through Paths.image() on every single note hit, which means a
-		// mod-folder string build plus a FileSystem.exists() syscall per press on mobile. Cache it
-		// like the ratings/numbers so popUpScore() only ever does loadGraphicFromSprite().
-		final comboImage:String = uiPrefix + 'combo' + uiSuffix;
-		if (!ratingsCache.exists(comboImage))
-		{
-			final comboGraphic:flixel.graphics.FlxGraphic = Paths.image(comboImage);
-			if (comboGraphic != null)
-				ratingsCache.set(comboImage, new FlxSprite().loadGraphic(comboGraphic));
-		}
-	}
-
-	/**
-	 * Grabs a dead sprite out of `comboGroup` to reuse, or grows the group by one if every sprite is
-	 * still on screen.
-	 *
-	 * The old code did `new FlxSprite()` for the rating, the combo sprite and every combo digit on
-	 * every note hit, then `destroy()`d them from a tween callback - so a note press allocated 3-6
-	 * sprites and threw away 3-6 more, and hxcpp had to collect them mid-song. Worse, the callback
-	 * cleared `container` *before* `destroy()`, which is exactly what `FlxBasic.destroy()` uses to
-	 * unregister itself, so every destroyed sprite stayed in `comboGroup.members` forever - the
-	 * group grew for the whole song and got walked twice a frame by update/draw.
-	 */
-	function getComboSprite():FlxSprite
-	{
-		for (spr in comboGroup.members)
-		{
-			if (spr != null && !spr.exists)
-			{
-				FlxTween.cancelTweensOf(spr);
-				spr.revive();
-				spr.alpha = 1;
-				spr.angle = 0;
-				spr.velocity.set();
-				spr.acceleration.set();
-				spr.scale.set(1, 1);
-				spr.offset.set();
-				return spr;
-			}
-		}
-
-		final spr:FlxSprite = new FlxSprite();
-		comboGroup.add(spr);
-		return spr;
-	}
-
-	/** Retires a combo sprite without destroying it, so `getComboSprite()` can hand it back out. */
-	static function retireComboSprite(spr:FlxSprite):Void
-	{
-		if (spr == null)
-			return;
-		spr.container = null;
-		spr.kill();
-		spr.velocity.set();
-		spr.acceleration.set();
-	}
-
-	private function popUpScore(note:Note = null):Void
-	{
-		var noteDiffNoAbs:Float = note.strumTime - Conductor.songPosition + ClientPrefs.data.ratingOffset;
-		var noteDiff:Float = Math.abs(noteDiffNoAbs);
-
-		if (!ClientPrefs.data.comboStacking && comboGroup.members.length > 0)
-		{
-			// Was `spr.destroy(); comboGroup.remove(spr);` while iterating the same group - that
-			// both mutated the collection mid-iteration and burned the sprite. Retire them instead
-			// so the pool can hand them straight back out.
-			for (spr in comboGroup.members)
-				if (spr != null && spr.exists)
-				{
-					FlxTween.cancelTweensOf(spr);
-					retireComboSprite(spr);
-				}
-		}
-
-		var placement:Float = FlxG.width * 0.35;
-		var rating:FlxSprite = null;
-
-		var judgment:String = Rating.judgeNote(noteDiff);
-		var score:Int = Rating.scoreNote(noteDiff);
-
-		// tryna do PBOT1 based judgment due to popular demand
-		var daRating:Rating = switch (judgment)
-		{
-			case 'sick':
-				ratingsData[0]; // sick
-			case 'good':
-				ratingsData[1]; // good
-			case 'bad':
-				ratingsData[2]; // bad
-			case 'shit':
-				ratingsData[3]; // shit
-			default:
-				ratingsData[3]; // default to shit
-		};
 
 		switch (daRating.image)
 		{
-			case 'good':
-				++totalGood;
-			case 'bad':
-				++totalBad;
-			case 'shit':
-				++totalShit;
-			default:
-				++totalSick;
+			case 'good': ++totalGood;
+			case 'bad': ++totalBad;
+			case 'shit': ++totalShit;
+			default: ++totalSick;
 		}
 
 		totalNotesHit += daRating.ratingMod;
 		note.ratingMod = daRating.ratingMod;
+
 		if (!note.ratingDisabled)
 			daRating.hits++;
+
 		note.rating = daRating.name;
 
 		if (daRating.noteSplash && !note.noteSplashData.disabled)
@@ -3080,204 +2899,113 @@ class PlayState extends MusicBeatState
 
 		if (!practiceMode && !cpuControlled && !note.ratingDisabled)
 		{
-			songScore += score;
+			songScore += Rating.scoreNote(noteDiff);
 			songHits++;
 			totalPlayed++;
 		}
 
-		var uiPrefix:String = "";
-		var uiSuffix:String = '';
-		var antialias:Bool = ClientPrefs.data.antialiasing;
-
-		if (stageUI != "normal")
-		{
-			uiPrefix = '${stageUI}UI/';
-			if (PlayState.isPixelStage)
-				uiSuffix = '-pixel';
-			antialias = !isPixelStage;
-		}
 		if (ClientPrefs.data.popUpRating)
 		{
-			rating = getComboSprite();
-			final ratingSource:FlxSprite = ratingsCache.get(uiPrefix + daRating.image + uiSuffix);
-			if (ratingSource != null)
-				rating.loadGraphicFromSprite(ratingSource);
-			rating.screenCenter();
-			rating.x = placement - 40;
-			rating.y -= 60;
-			rating.acceleration.y = 550 * playbackRate * playbackRate;
-			rating.velocity.y -= FlxG.random.int(140, 175) * playbackRate;
-			rating.velocity.x -= FlxG.random.int(0, 10) * playbackRate;
-			rating.visible = (!ClientPrefs.data.hideHud && showRating);
-			rating.x += ClientPrefs.data.comboOffset[0];
-			rating.y -= ClientPrefs.data.comboOffset[1];
-			rating.antialiasing = antialias;
-			rating.pixelPerfectRender = !antialias;
-			rating.pixelPerfectPosition = !antialias;
+			final uiPrefix:String = stageUI != "normal" ? '${stageUI}UI/' : '';
+			final uiSuffix:String = isPixelStage ? '-pixel' : '';
+			final antialias:Bool = ClientPrefs.data.antialiasing && (stageUI == "normal" || !isPixelStage);
+			final lifetime:Float = Conductor.crochet * 0.001 / playbackRate;
+			final placement:Float = FlxG.width * 0.35;
+			var yoRating:Float = 0;
 
-			var comboSpr:FlxSprite = getComboSprite();
-			final comboSource:FlxSprite = ratingsCache.get(uiPrefix + 'combo' + uiSuffix);
-			if (comboSource != null)
-				comboSpr.loadGraphicFromSprite(comboSource);
-			comboSpr.screenCenter();
-			comboSpr.x = placement;
-			comboSpr.acceleration.y = FlxG.random.int(200, 300) * playbackRate * playbackRate;
-			comboSpr.velocity.y -= FlxG.random.int(140, 160) * playbackRate;
-			comboSpr.visible = (!ClientPrefs.data.hideHud && showCombo);
-			comboSpr.x += ClientPrefs.data.comboOffset[0];
-			comboSpr.y -= ClientPrefs.data.comboOffset[1];
-			comboSpr.antialiasing = antialias;
-			comboSpr.pixelPerfectRender = !antialias;
-			comboSpr.pixelPerfectPosition = !antialias;
-			comboSpr.y += 60;
-			comboSpr.velocity.x += FlxG.random.int(1, 10) * playbackRate;
-
-			if (!PlayState.isPixelStage)
+			if(showRating)
 			{
-				rating.setGraphicSize(Std.int(rating.width * 0.7));
-				comboSpr.setGraphicSize(Std.int(comboSpr.width * 0.7));
-			}
-			else
-			{
-				rating.setGraphicSize(Std.int(rating.width * daPixelZoom * 0.85));
-				comboSpr.setGraphicSize(Std.int(comboSpr.width * daPixelZoom * 0.85));
+				final rating:Combo = comboGroup.recycle(Combo);
+				rating.loadGraphic(Paths.image(uiPrefix + daRating.image + uiSuffix));
+				rating.screenCenter();
+				rating.alpha = 1;
+				rating.x = placement - 40 + ClientPrefs.data.comboOffset[0];
+				rating.y -= 60 + ClientPrefs.data.comboOffset[1];
+				rating.acceleration.set(0, 550 * playbackRate * playbackRate);
+				rating.velocity.set();
+				rating.velocity.x -= FlxG.random.int(-10, 10) * playbackRate;
+				rating.velocity.y -= FlxG.random.int(130, 160) * playbackRate;
+				rating.antialiasing = antialias;
+				rating.pixelPerfectRender = rating.pixelPerfectPosition = !antialias;
+				rating.cameras = [camHUD];
+				rating.lifeTime = lifetime;
+				rating.setGraphicSize(Std.int(rating.width * (isPixelStage ? daPixelZoom * 0.85 : 0.7)));
+				rating.updateHitbox();
+				rating.ID = Std.int(Conductor.songPosition);
+				yoRating = rating.y + rating.height;
 			}
 
-			comboSpr.updateHitbox();
-			rating.updateHitbox();
-
-			if (ClientPrefs.data.showNoteTiming && (!ClientPrefs.data.hideHud && showRating) && noteTimingRating == null)
+			if(showCombo)
 			{
-				add(noteTimingRating = new FlxText(0, 0, 0, "0ms"));
-				// One-time formatting. Re-applying borderStyle/borderSize/size per hit marked the
-				// text dirty every press, forcing a glyph re-raster and a fresh GPU texture upload.
-				noteTimingRating.borderStyle = #if mobile OUTLINE_FAST #else OUTLINE #end;
-				noteTimingRating.borderSize = 1;
-				noteTimingRating.borderColor = FlxColor.BLACK;
-				noteTimingRating.size = 20;
-				noteTimingRating.camera = camHUD;
+				final comboSpr:Combo = comboGroup.recycle(Combo);
+				comboSpr.loadGraphic(Paths.image(uiPrefix + 'combo' + uiSuffix));
+				comboSpr.screenCenter();
+				comboSpr.x = placement + 40 + ClientPrefs.data.comboOffset[0];
+				comboSpr.y += 50 + ClientPrefs.data.comboOffset[1];
+				comboSpr.alpha = 1;
+				comboSpr.acceleration.set(0, FlxG.random.int(200, 300) * playbackRate * playbackRate);
+				comboSpr.velocity.set();
+				comboSpr.velocity.x += FlxG.random.int(1, 10) * playbackRate;
+				comboSpr.velocity.y -= FlxG.random.int(140, 160) * playbackRate;
+				comboSpr.antialiasing = antialias;
+				comboSpr.pixelPerfectRender = comboSpr.pixelPerfectPosition = !antialias;
+				comboSpr.cameras = [camHUD];
+				comboSpr.lifeTime = lifetime;
+				comboSpr.setGraphicSize(Std.int(comboSpr.width * (isPixelStage ? daPixelZoom * 0.75 : 0.6)));
+				comboSpr.updateHitbox();
+				comboSpr.ID = Std.int(Conductor.songPosition);
 			}
-			if (noteTimingRating != null)
+
+			if (ClientPrefs.data.showNoteTiming && showRating)
 			{
-				switch (daRating.name)
+				noteTimingRating.color = switch (daRating.name)
 				{
-					case 'shit' | 'bad':
-						noteTimingRating.color = FlxColor.RED;
-					case 'good':
-						noteTimingRating.color = FlxColor.LIME;
-					case 'sick':
-						noteTimingRating.color = FlxColor.CYAN;
+					case 'sick': FlxColor.CYAN;
+					case 'good': FlxColor.LIME;
+					default: FlxColor.RED;
 				}
+
 				noteTimingRating.text = FlxMath.roundDecimal(noteDiffNoAbs / playbackRate, 3) + "ms";
 				noteTimingRating.alpha = 1;
-				noteTimingRating.active = true;
-
-				if (noteTimingRatingTween != null)
-				{
-					noteTimingRatingTween.cancel();
-				}
-
-				noteTimingRating.screenCenter();
-				noteTimingRating.x = placement + ClientPrefs.data.comboOffset[0] + 100;
-				noteTimingRating.y += -ClientPrefs.data.comboOffset[1] - 80 + (comboSpr?.height ?? 0);
-				if (PlayState.isPixelStage)
-					noteTimingRating.y += 60;
-				noteTimingRating.acceleration.y = 600;
-				noteTimingRating.velocity.y -= 150;
-				noteTimingRating.velocity.x += comboSpr?.velocity?.x ?? (FlxG.random.int(1, 10) * playbackRate);
+				noteTimingRating.exists = true;
+				noteTimingRating.setPosition(placement + ClientPrefs.data.comboOffset[0] + 100, yoRating + (isPixelStage ? 60 : 0));
+				noteTimingRatingTween?.cancel();
 
 				noteTimingRatingTween = FlxTween.tween(noteTimingRating, {alpha: 0}, 0.2 / playbackRate, {
 					startDelay: Conductor.crochet * 0.001 / playbackRate,
-					onComplete: (t) -> noteTimingRating.active = false,
+					onComplete: (_) -> noteTimingRating.exists = false,
 					ease: isPixelStage ? EaseUtil.stepped(2) : null
 				});
 			}
 
-			// Digit split without going through Std.string()/charAt()/parseInt() - that was three
-			// string allocations plus a parse per digit, on every note hit.
-			final seperatedScore:Array<Int> = _comboDigits;
-			seperatedScore.splice(0, seperatedScore.length);
-			var comboLeft:Int = combo < 0 ? 0 : combo;
-			if (comboLeft == 0)
-				seperatedScore.push(0);
-			else
+			if (showComboNum)
 			{
-				while (comboLeft > 0)
+				final sepScore:String = '$combo';
+
+				for (i in 0...sepScore.length)
 				{
-					seperatedScore.insert(0, comboLeft % 10);
-					comboLeft = Std.int(comboLeft / 10);
+					final num:Int = Std.parseInt(sepScore.charAt(i));
+					final numScore:Combo = comboGroup.recycle(Combo);
+					numScore.loadGraphic(Paths.image(uiPrefix + 'num' + num + uiSuffix));
+					numScore.screenCenter();
+					numScore.alpha = 1;
+					numScore.x = (placement - 30 + ClientPrefs.data.comboOffset[2]) - (sepScore.length * 43 / 2) + i * 43;
+					numScore.y += 80 - ClientPrefs.data.comboOffset[3];
+					numScore.setGraphicSize(Std.int(numScore.width * (isPixelStage ? daPixelZoom : 0.5)));
+					numScore.updateHitbox();
+					numScore.velocity.set(0, 0);
+					numScore.velocity.x -= FlxG.random.float(-10, 10) * playbackRate;
+					numScore.velocity.y -= FlxG.random.int(135, 155) * playbackRate;
+					numScore.acceleration.set(0, FlxG.random.int(200, 300) * playbackRate * playbackRate);
+					numScore.antialiasing = antialias;
+					numScore.pixelPerfectRender = numScore.pixelPerfectPosition = !antialias;
+					numScore.cameras = [camHUD];
+					numScore.lifeTime = lifetime;
+					numScore.ID = Std.int(Conductor.songPosition);
 				}
 			}
 
-			var daLoop:Int = 0;
-			var xThing:Float = 0;
-
-			for (i in seperatedScore)
-			{
-				var numScore:FlxSprite = getComboSprite();
-				final numSource:FlxSprite = ratingsCache.get(uiPrefix + 'num' + i + uiSuffix);
-				if (numSource != null)
-					numScore.loadGraphicFromSprite(numSource);
-				numScore.screenCenter();
-
-				var totalNums:Int = seperatedScore.length;
-				var numWidth:Int = 43;
-				var totalWidth:Int = totalNums * numWidth;
-				var centerX:Float = placement - 30 + ClientPrefs.data.comboOffset[2];
-				var startX:Float = centerX - (totalWidth / 2);
-
-				numScore.x = startX + (numWidth * daLoop);
-				numScore.y += 80 - ClientPrefs.data.comboOffset[3];
-
-				if (!PlayState.isPixelStage)
-					numScore.setGraphicSize(Std.int(numScore.width * 0.5));
-				else
-					numScore.setGraphicSize(Std.int(numScore.width * daPixelZoom));
-				numScore.updateHitbox();
-
-				numScore.acceleration.y = FlxG.random.int(200, 300) * playbackRate * playbackRate;
-				numScore.velocity.y -= FlxG.random.int(140, 160) * playbackRate;
-				numScore.velocity.x = FlxG.random.float(-5, 5) * playbackRate;
-				numScore.visible = !ClientPrefs.data.hideHud;
-				numScore.antialiasing = antialias;
-				numScore.pixelPerfectRender = !antialias;
-				numScore.pixelPerfectPosition = !antialias;
-
-				// if (combo >= 10 || combo == 0)
-				if (!showComboNum)
-					numScore.visible = false;
-
-				FlxTween.tween(numScore, {alpha: 0}, 0.2 / playbackRate, {
-					onComplete: function(tween:FlxTween)
-					{
-						retireComboSprite(numScore);
-					},
-					startDelay: Conductor.crochet * 0.002 / playbackRate,
-					ease: isPixelStage ? EaseUtil.stepped(2) : null
-				});
-
-				daLoop++;
-				if (numScore.x > xThing)
-					xThing = numScore.x;
-			}
-			comboSpr.x = xThing + 50;
-			FlxTween.tween(rating, {alpha: 0}, 0.2 / playbackRate, {
-				startDelay: Conductor.crochet * 0.001 / playbackRate,
-				onComplete: function(tween:FlxTween)
-				{
-					retireComboSprite(rating);
-				},
-				ease: isPixelStage ? EaseUtil.stepped(2) : null
-			});
-
-			FlxTween.tween(comboSpr, {alpha: 0}, 0.2 / playbackRate, {
-				onComplete: function(tween:FlxTween)
-				{
-					retireComboSprite(comboSpr);
-				},
-				startDelay: Conductor.crochet * 0.002 / playbackRate,
-				ease: isPixelStage ? EaseUtil.stepped(2) : null
-			});
+			comboGroup.sort((o:Int, a:Combo, b:Combo) -> return FlxSort.byValues(FlxSort.ASCENDING, a.ID, b.ID));
 		}
 	}
 
@@ -4432,4 +4160,10 @@ class PlayState extends MusicBeatState
 			FlxG.signals.preUpdate.add(checkForResync);
 	}
 	#end
+}
+
+
+class Combo extends FlxSprite
+{
+	public var lifeTime:Float = 0;
 }
