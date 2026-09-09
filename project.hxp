@@ -246,6 +246,7 @@ class Project extends HXProject
 
 		setHaxedef("message.reporting", "pretty");
 		setHaxedef("lime_disable_assets_version");
+		setHaxedef("openfl_dpi_aware");
 		setHaxedef("openfl_pool_events"); // https://github.com/FunkinCrew/Funkin/pull/7898
 
 		setHaxedef("HXCPP_CHECK_POINTER");
