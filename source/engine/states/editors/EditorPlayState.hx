@@ -798,7 +798,7 @@ class EditorPlayState extends MusicBeatSubstate
 		// add(coolText);
 
 		FlxTween.tween(rating, {alpha: 0}, 0.2 / playbackRate, {
-			startDelay: Conductor.crochet * 0.001 / playbackRate
+			startDelay: Conductor.crochet * 0.001 / playbackRate,
 			onComplete: function(tween:FlxTween)
 			{
 				rating.container = null;
