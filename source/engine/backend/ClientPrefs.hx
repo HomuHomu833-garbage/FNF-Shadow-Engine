@@ -20,7 +20,9 @@ import states.TitleState;
 	public var useExternalStorage:Bool = false;
 	#end
 	public var hitboxType:String = "Gradient";
-	// public var gameOverVibration:Bool = false;
+	#if FEATURE_HAPTICS
+	public var gameOverVibration:Bool = false;
+	#end
 	// end of Mobile and Mobile Controls Releated
 
 	public var downScroll:Bool = false;

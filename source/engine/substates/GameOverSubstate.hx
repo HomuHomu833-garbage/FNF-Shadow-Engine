@@ -4,7 +4,6 @@ import objects.Character;
 import flixel.FlxObject;
 import states.StoryMenuState;
 import states.FreeplayState;
-//import lime.ui.Haptic;
 import effects.RetroCameraFade;
 import backend.StageData;
 import haxe.Json;
@@ -54,8 +53,10 @@ class GameOverSubstate extends MusicBeatSubstate
 	{
 		instance = this;
 
-		/*if (ClientPrefs.data.gameOverVibration)
-			Haptic.vibrate(0, 500);*/
+		#if FEATURE_HAPTICS
+		if (ClientPrefs.data.gameOverVibration)
+			extension.haptics.Haptic.vibrateOneShot(0.5, 1, 1);
+		#end
 
 		Conductor.songPosition = 0;
 

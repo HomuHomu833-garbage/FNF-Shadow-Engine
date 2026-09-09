@@ -3,13 +3,13 @@
     {
       "name": "lime",
       "type": "git",
-      "ref": "0a53245185f3c72971bb34c870c05a7ef439fd1b",
+      "ref": "7c86c41d4b8c5cdc931ddbdb0bd20e21bba81bb3",
       "url": "https://github.com/ShadowEngineTeam/lime"
     },
     {
       "name": "openfl",
       "type": "git",
-      "ref": "0ca9c246f2c5a818651ab956f35324e790f8e5f6",
+      "ref": "5a117bef106f0ec23d667cf5acdc24d9a4d4f2a9",
       "url": "https://github.com/ShadowEngineTeam/openfl"
     },
     {
@@ -27,7 +27,7 @@
     {
       "name": "hxcpp",
       "type": "git",
-      "ref": "9aa12eb95043116ff84130b2615bb9a106994706",
+      "ref": "757733598bdf5dc408a2c0ebafb73b6e46294ffd",
       "url": "https://github.com/ShadowEngineTeam/hxcpp"
     },
     {
@@ -89,6 +89,12 @@
       "type": "git",
       "ref": "4b02f68790e2b7683828371258414cf7a6db2bb9",
       "url": "https://github.com/ShadowEngineTeam/flixel-animate"
+    },
+    {
+      "name": "extension-haptics",
+      "type": "git",
+      "ref": "8978b34b437f943a0d164bd6b3d8b69bd0025081",
+      "url": "https://github.com/LimeExtensions/extension-haptics"
     },
     {
       "name": "tink_core",

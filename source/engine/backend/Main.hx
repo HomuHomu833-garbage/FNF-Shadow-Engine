@@ -8,7 +8,6 @@ import haxe.io.Path;
 import openfl.Lib;
 import openfl.display.Sprite;
 import openfl.events.Event;
-import openfl.display.StageScaleMode;
 import lime.system.System as LimeSystem;
 import states.InitState;
 import openfl.events.KeyboardEvent;
@@ -19,7 +18,6 @@ class Main extends Sprite
 		width: 1280, // game width
 		height: 720, // game height
 		initialState: InitState, // initial game state
-		zoom: -1.0, // game state bounds
 		framerate: 60, // default framerate
 		skipSplash: true, // if the flixel splash screen should be skipped
 		startFullscreen: false // if the game should start at fullscreen mode
@@ -77,9 +75,6 @@ class Main extends Sprite
 
 	private function setupGame():Void
 	{
-		if (game.zoom == -1.0)
-			game.zoom = 1.0;
-
 		untyped FlxG.cameras = new backend.rendering.ShadowCameraFrontEnd();
 
 		final funkinGame:FlxGame = new FlxGame(game.width, game.height, game.initialState, game.framerate, game.framerate, game.skipSplash,
@@ -100,11 +95,13 @@ class Main extends Sprite
         FlxG.game.addChildAt(mouseSprite, FlxG.game.getChildIndex(fpsVar) + 1);
         untyped FlxG.mouse.cursorContainer = mouseSprite;
 
-		Lib.current.stage.align = "tl";
-		Lib.current.stage.scaleMode = StageScaleMode.NO_SCALE;
-		#if mobile
-		//FlxG.game.stage.quality = openfl.display.StageQuality.LOW;
+		FlxG.stage.align = "tl";
+		FlxG.stage.scaleMode = NO_SCALE;
+
+		#if FEATURE_HAPTICS
+		extension.haptics.Haptic.initialize();
 		#end
+
 		if (fpsVar != null)
 			fpsVar.visible = true;
 
