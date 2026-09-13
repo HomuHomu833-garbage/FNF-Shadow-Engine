@@ -15,6 +15,7 @@ import flixel.util.FlxSort;
 import flixel.input.keyboard.FlxKey;
 import flixel.animation.FlxAnimationController;
 import openfl.utils.Assets;
+import openfl.media.Sound;
 import openfl.events.KeyboardEvent;
 import cutscenes.CutsceneHandler;
 import cutscenes.DialogueBoxPsych;
@@ -456,7 +457,7 @@ class PlayState extends MusicBeatState
 
 		if (stageData.objects?.length > 0)
 		{
-			final list:Map<String, FlxSprite> = StageData.addObjectsToState(stageData.objects, !stageData.hide_girlfriend ? gfGroup : null, dadGroup, boyfriendGroup, this);
+			final list:Map<String, FlxSprite> = StageData.addObjectsToState(stageData.objects, gfGroup, dadGroup, boyfriendGroup, this);
 			for (key => spr in list)
 			{
 				if (!StageData.reservedNames.contains(key))
@@ -835,9 +836,9 @@ class PlayState extends MusicBeatState
 				if (gf != null && !gfMap.exists(newCharacter))
 				{
 					final newGf:Character = new Character(0, 0, newCharacter);
-					newGf.scrollFactor.set(0.95, 0.95);
 					gfMap.set(newCharacter, newGf);
 					gfGroup.add(newGf);
+					newGf.scrollFactor.set(0.95, 0.95);
 					startCharacterPos(newGf);
 					newGf.alpha = 0.00001;
 					startCharacterScripts(newGf.curCharacter);
@@ -1264,11 +1265,53 @@ class PlayState extends MusicBeatState
 	public function skipDialogue():Void
 		callOnScripts('onSkipDialogue', [dialogueCount]);
 
+	function songAudioSuffixes():Array<Null<String>>
+	{
+		final variant:Null<String> = (SONG.variant?.length > 0) ? SONG.variant : null;
+		final erect:Null<String> = Difficulty.getSongPrefix(null, false);
+		final list:Array<Null<String>> = [];
+
+		if (variant != null && erect != null)
+			list.push('$variant-$erect');
+		if (variant != null)
+			list.push(variant);
+		if (erect != null)
+			list.push(erect);
+		list.push(null);
+
+		return list;
+	}
+
+	function findInst():Sound
+	{
+		for (suffix in songAudioSuffixes())
+		{
+			final snd:Sound = Paths.inst(SONG.song, suffix);
+			if (snd != null)
+				return snd;
+		}
+		return null;
+	}
+
+	function findVocals(?name:String):Sound
+	{
+		final prefix:Null<String> = (name != null && name.length > 0) ? name : null;
+
+		for (suffix in songAudioSuffixes())
+		{
+			final postfix:Null<String> = (prefix != null && suffix != null) ? '$prefix-$suffix' : (prefix ?? suffix);
+			final snd:Sound = Paths.voices(SONG.song, postfix);
+			if (snd != null)
+				return snd;
+		}
+		return null;
+	}
+
 	function startSong():Void
 	{
 		startingSong = false;
 
-		FlxG.sound.playMusic(Paths.inst(SONG.song, Difficulty.getSongPrefix(null, false)), 1, false);
+		FlxG.sound.playMusic(findInst(), 1, false);
 		FlxG.sound.music.pitch = playbackRate;
 		FlxG.sound.music.onComplete = () -> finishSong();
 
@@ -1325,11 +1368,11 @@ class PlayState extends MusicBeatState
 		{
 			if (SONG.needsVoices)
 			{
-				final playerVocals = Paths.voices(SONG.song, boyfriend.vocalsFile + Difficulty.getSongPrefix()) ?? Paths.voices(SONG.song, 'Player' + Difficulty.getSongPrefix());
-				vocals.loadEmbedded(playerVocals ?? Paths.voices(SONG.song, Difficulty.getSongPrefix(null, false)));
+				final playerVocals:Sound = findVocals(boyfriend.vocalsFile) ?? findVocals('Player') ?? findVocals();
+				vocals.loadEmbedded(playerVocals);
 				vocals.pitch = playbackRate;
 
-				final oppVocals = Paths.voices(SONG.song, dad.vocalsFile + Difficulty.getSongPrefix()) ?? Paths.voices(SONG.song, 'Opponent' + Difficulty.getSongPrefix());
+				final oppVocals:Sound = findVocals(dad.vocalsFile) ?? findVocals('Opponent');
 				if (oppVocals != null) {
 					opponentVocals.loadEmbedded(oppVocals);
 					opponentVocals.pitch = playbackRate;
