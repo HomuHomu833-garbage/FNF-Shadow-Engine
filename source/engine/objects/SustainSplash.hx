@@ -125,29 +125,12 @@ class SustainSplash extends FlxSprite
 		reloadSustainSplash(getTextureNameFromData(noteData, mustPress));
 	}
 
-	public function reloadSustainSplash(texture:String, force:Bool = false):Void
+	public function new()
 	{
-		if (texture != null && texture != DEFAULT_TEXTURE)
-			precacheSustainSplash();
+		super();
 
-		if (texture == null)
-			texture = DEFAULT_TEXTURE;
-
-		if (curTexture == texture && !force)
-		{
-			animation.play('start', true, false, 0);
-			return;
-		}
-
-		curTexture = texture;
-
-		// SHADOW TODO: This breaks offsets need to figure it out later
-		// flipY = ClientPrefs.data.downScroll;
-
-		if (PlayState.isPixelStage.priorityBool(usePixelTextures))
-			texture = 'pixelUI/' + texture;
-
-		frames = Paths.getSparrowAtlas(texture);
+		// Registered once: setting `frames` clears the animations but not this signal, so adding
+		// it in reloadSustainSplash() stacked one more listener on every texture change.
 		animation.onFinish.add((name:String) ->
 		{
 			switch (name)
@@ -158,6 +141,33 @@ class SustainSplash extends FlxSprite
 					kill();
 			}
 		});
+	}
+
+	public function reloadSustainSplash(texture:String, force:Bool = false):Void
+	{
+		if (texture == null)
+			texture = DEFAULT_TEXTURE;
+
+		// Recycled splashes usually keep their texture; this runs for every hold note, so return
+		// before touching Paths (each lookup is several filesystem checks).
+		if (curTexture == texture && !force)
+		{
+			animation.play('start', true, false, 0);
+			return;
+		}
+
+		if (texture != DEFAULT_TEXTURE)
+			precacheSustainSplash();
+
+		curTexture = texture;
+
+		// SHADOW TODO: This breaks offsets need to figure it out later
+		// flipY = ClientPrefs.data.downScroll;
+
+		if (PlayState.isPixelStage.priorityBool(usePixelTextures))
+			texture = 'pixelUI/' + texture;
+
+		frames = Paths.getSparrowAtlas(texture);
 		animation.addByPrefix('start', 'holdCoverStart0', 24, false);
 		animation.addByPrefix('hold', 'holdCover0', SustainSplash.frameRate, true);
 		animation.addByPrefix('end', 'holdCoverEnd0', 24, false);

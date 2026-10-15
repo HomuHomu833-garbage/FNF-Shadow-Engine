@@ -37,6 +37,9 @@ class Mods
 
 	inline public static function pushGlobalMods() // prob a better way to do this but idc
 	{
+		// Remembered image paths assume the current set of global mods.
+		Paths.clearPathCaches();
+
 		globalMods = [];
 		for (mod in parseList().enabled)
 		{
