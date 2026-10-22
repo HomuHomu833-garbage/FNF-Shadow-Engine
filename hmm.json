@@ -3,19 +3,19 @@
     {
       "name": "lime",
       "type": "git",
-      "ref": "9cb827d3c6d341a12e7475acef58eaf6e872b449",
+      "ref": "a11a38188cd85771aa90258b88552b50bd3fc475",
       "url": "https://github.com/ShadowEngineTeam/lime"
     },
     {
       "name": "openfl",
       "type": "git",
-      "ref": "b42965c8aa7580e3d576a2c5705b9b37e9abe1ea",
+      "ref": "d1dbc326febdc79f8817d94d9e944de5218398d3",
       "url": "https://github.com/ShadowEngineTeam/openfl"
     },
     {
       "name": "flixel",
       "type": "git",
-      "ref": "496b18db34247a8eb08963b23ae0570907926113",
+      "ref": "41af7ea481ce9d20ccfd2ea2b8405a25cfb04853",
       "url": "https://github.com/ShadowEngineTeam/flixel"
     },
     {
@@ -27,13 +27,13 @@
     {
       "name": "hxcpp",
       "type": "git",
-      "ref": "ebcf99f17c428a7c47e49513a6b7419d2cbd9728",
+      "ref": "f676c9c84d3efacca546e4019ce7332c139ce3a6",
       "url": "https://github.com/ShadowEngineTeam/hxcpp"
     },
     {
       "name": "SScript",
       "type": "git",
-      "ref": "83a5b765e3d94f56383ea7ecda195a1becb26e83",
+      "ref": "b1cccc6d437f5bfffab235e3d772a89a8b9cb3cc",
       "url": "https://github.com/ShadowEngineTeam/ShadowScript"
     },
     {
@@ -45,7 +45,7 @@
     {
       "name": "hxluau",
       "type": "git",
-      "ref": "d6a0a8ce6b00c3a850be29b7803e2412ee148eea",
+      "ref": "8b53b273bd38e3a178a3d28bf260e22f8b72732c",
       "url": "https://github.com/ShadowEngineTeam/hxluau"
     },
     {
@@ -81,7 +81,7 @@
     {
       "name": "hxvlc",
       "type": "git",
-      "ref": "10d40fdbcdfb4a0cfa6e45ed39f54fbaa9f17404",
+      "ref": "6dce337e145e1a64fb7db74a8c275d72ddf18706",
       "url": "https://github.com/ShadowEngineTeam/hxvlc"
     },
     {

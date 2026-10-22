@@ -83,6 +83,55 @@ extern class Native_TracyProfiler
   **/
   @:native('HXCPP_TRACY_ZONE')
   public static function zoneScoped(_name:String):Void;
+
+  /**
+    Create a custom named scoped zone with extra text in your code.
+  **/
+  @:native('HXCPP_TRACY_ZONE_TEXT')
+  public static function zoneScopedText(_name:String, _text:String):Void;
+
+  /**
+    Enable or disable the zones created automatically for Haxe function calls on the calling thread.
+    Manual zones are unaffected. Returns the previous setting so it can be restored.
+  **/
+  @:native('::__hxcpp_tracy_set_function_zones')
+  public static function setFunctionZones(_enabled:Bool):Bool;
+
+  /**
+    Get the current automatic function zone depth on the calling thread.
+  **/
+  @:native('::__hxcpp_tracy_get_zone_count')
+  public static function getZoneCount():Int;
+
+  /**
+    Whether a Tracy profiler is currently connected.
+  **/
+  @:native('::__hxcpp_tracy_is_connected')
+  public static function isConnected():Bool;
+
+  /**
+    Set the text of the current zone on the calling thread.
+  **/
+  @:native('::__hxcpp_tracy_zone_text')
+  public static function zoneText(_text:String):Void;
+
+  /**
+    Set the name of the current zone on the calling thread.
+  **/
+  @:native('::__hxcpp_tracy_zone_name')
+  public static function zoneName(_name:String):Void;
+
+  /**
+    Set the color of the current zone on the calling thread.
+  **/
+  @:native('::__hxcpp_tracy_zone_color')
+  public static function zoneColor(_color:Int):Void;
+
+  /**
+    Attach a numeric value to the current zone on the calling thread.
+  **/
+  @:native('::__hxcpp_tracy_zone_value')
+  public static function zoneValue(_value:cpp.Int64):Void;
 }
 
 #if (scriptable || cppia)
@@ -118,6 +167,30 @@ class Cppia_TracyProfiler
 
   @:inheritDoc(cpp.vm.tracy.Native_TracyProfiler.zoneScoped)
   public static function zoneScoped(_name:String) Native_TracyProfiler.zoneScoped(_name);
+
+  @:inheritDoc(cpp.vm.tracy.Native_TracyProfiler.zoneScopedText)
+  public static function zoneScopedText(_name:String, _text:String) Native_TracyProfiler.zoneScopedText(_name, _text);
+
+  @:inheritDoc(cpp.vm.tracy.Native_TracyProfiler.setFunctionZones)
+  public static function setFunctionZones(_enabled:Bool):Bool return Native_TracyProfiler.setFunctionZones(_enabled);
+
+  @:inheritDoc(cpp.vm.tracy.Native_TracyProfiler.getZoneCount)
+  public static function getZoneCount():Int return Native_TracyProfiler.getZoneCount();
+
+  @:inheritDoc(cpp.vm.tracy.Native_TracyProfiler.isConnected)
+  public static function isConnected():Bool return Native_TracyProfiler.isConnected();
+
+  @:inheritDoc(cpp.vm.tracy.Native_TracyProfiler.zoneText)
+  public static function zoneText(_text:String) Native_TracyProfiler.zoneText(_text);
+
+  @:inheritDoc(cpp.vm.tracy.Native_TracyProfiler.zoneName)
+  public static function zoneName(_name:String) Native_TracyProfiler.zoneName(_name);
+
+  @:inheritDoc(cpp.vm.tracy.Native_TracyProfiler.zoneColor)
+  public static function zoneColor(_color:Int) Native_TracyProfiler.zoneColor(_color);
+
+  @:inheritDoc(cpp.vm.tracy.Native_TracyProfiler.zoneValue)
+  public static function zoneValue(_value:cpp.Int64) Native_TracyProfiler.zoneValue(_value);
 }
 
 typedef TracyProfiler = Cppia_TracyProfiler;
