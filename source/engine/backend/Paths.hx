@@ -60,6 +60,26 @@ class Paths
 	inline public static function isLocallyTracked(key:String):Bool
 		return localTrackedSet.exists(key);
 
+	// Resolving an image key costs a FileSystem.exists() per mod folder per format, and sprites
+	// re-request the same images constantly (hold covers do it for every sustain note), so remember
+	// which file each loaded key resolved to. Entries are only trusted while that graphic is still
+	// tracked, and are dropped with the other path caches on clearStoredMemory().
+	static final imagePathMemo:Map<String, String> = [];
+
+	inline static function imageMemoKey(key:String, library:String):String
+		return #if FEATURE_MODS '${Mods.currentModDirectory}|' + #end '$library|$key';
+
+	/**
+	 * Forgets every remembered path lookup (resolved image keys and the filesystem's directory
+	 * listings). Call it after files are added or moved behind the engine's back, or after the
+	 * active mods change.
+	 */
+	public static function clearPathCaches():Void
+	{
+		imagePathMemo.clear();
+		FileSystem.clearCache();
+	}
+
 	// haya I love you for the base cache dump I took to the max
 	public static function excludeAsset(key:String):Void
 	{
@@ -119,6 +139,7 @@ class Paths
 		localTrackedAssets = [];
 		localTrackedSet = [];
 		openfl.Assets.cache.clear("songs");
+		clearPathCaches();
 	}
 
 	public static function getPath(file:String, ?type:AssetType = TEXT, ?library:Null<String> = null, ?modsAllowed:Bool = false):String
@@ -313,11 +334,20 @@ class Paths
 		var bitmap:BitmapData = null;
 		var file:String = null;
 
+		final memoKey:String = imageMemoKey(key, library);
+		final memoFile:Null<String> = imagePathMemo.get(memoKey);
+		if (memoFile != null && currentTrackedAssets.exists(memoFile))
+		{
+			trackLocalAsset(memoFile);
+			return currentTrackedAssets.get(memoFile);
+		}
+
 		#if FEATURE_MODS
 		file = modsImages(key);
 		if (currentTrackedAssets.exists(file))
 		{
 			trackLocalAsset(file);
+			imagePathMemo.set(memoKey, file);
 			return currentTrackedAssets.get(file);
 		}
 		else if (FileSystem.exists(file))
@@ -339,6 +369,7 @@ class Paths
 				if (currentTrackedAssets.exists(file))
 				{
 					trackLocalAsset(file);
+					imagePathMemo.set(memoKey, file);
 					return currentTrackedAssets.get(file);
 				}
 				else if (FileSystem.exists(file))
@@ -353,7 +384,10 @@ class Paths
 		{
 			var retVal = cacheBitmap(file, bitmap);
 			if (retVal != null)
+			{
+				imagePathMemo.set(memoKey, file);
 				return retVal;
+			}
 		}
 
 		trace('Failed to load image: $file');
@@ -485,9 +519,18 @@ class Paths
 		return null;
 	}
 
+	// FlxAtlasFrames.fromSparrow() & co. return the frames already parsed for a graphic and ignore the
+	// description they are given, so once an image has frames, finding and reading its xml/json/txt
+	// again is wasted filesystem work.
+	inline static function cachedAtlasFrames(graphic:FlxGraphic):Null<FlxAtlasFrames>
+		return graphic != null ? FlxAtlasFrames.findFrame(graphic) : null;
+
 	public static function getAtlas(key:String, ?library:String = null):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, library);
+		var cached:Null<FlxAtlasFrames> = cachedAtlasFrames(imageLoaded);
+		if (cached != null)
+			return cached;
 
 		var xmlPath:String = getPath('images/$key.xml', TEXT, library, true);
 		#if FEATURE_MODS
@@ -515,6 +558,9 @@ class Paths
 	public static function getSparrowAtlas(key:String, ?library:String = null):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, library);
+		var cached:Null<FlxAtlasFrames> = cachedAtlasFrames(imageLoaded);
+		if (cached != null)
+			return cached;
 
 		#if FEATURE_MODS
 		var modXml:String = modsXml(key);
@@ -529,6 +575,9 @@ class Paths
 	public static function getPackerAtlas(key:String, ?library:String = null):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, library);
+		var cached:Null<FlxAtlasFrames> = cachedAtlasFrames(imageLoaded);
+		if (cached != null)
+			return cached;
 
 		#if FEATURE_MODS
 		var modTxt:String = modsTxt(key);
@@ -543,6 +592,9 @@ class Paths
 	public static function getAsepriteAtlas(key:String, ?library:String = null):FlxAtlasFrames
 	{
 		var imageLoaded:FlxGraphic = image(key, library);
+		var cached:Null<FlxAtlasFrames> = cachedAtlasFrames(imageLoaded);
+		if (cached != null)
+			return cached;
 
 		#if FEATURE_MODS
 		var modJson:String = modsImagesJson(key);

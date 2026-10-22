@@ -11,6 +11,9 @@ import mobile.backend.io.Assets as MobileAssets;
 import sys.FileSystem as SysFileSystem;
 import sys.FileStat;
 #end
+#if (linux && FEATURE_MODS)
+import sys.thread.Mutex;
+#end
 
 using StringTools;
 
@@ -45,11 +48,7 @@ class FileSystem
 	{
 		#if FEATURE_MODS
 		#if linux
-		var actualPath:String = cwd(path);
-		actualPath = getCaseInsensitivePath(path);
-		if (actualPath == null)
-			actualPath = path;
-		if (SysFileSystem.exists(actualPath))
+		if (getCaseInsensitivePath(cwd(path)) != null)
 			return true;
 		#else
 		if (SysFileSystem.exists(cwd(path)))
@@ -85,6 +84,8 @@ class FileSystem
 			SysFileSystem.rename(cwd(path), cwd(newPath));
 		#end
 		#end
+
+		clearCache();
 	}
 
 	public static function stat(path:String):Null<#if sys FileStat #else Dynamic #end>
@@ -180,6 +181,8 @@ class FileSystem
 		if (!SysFileSystem.exists(cwd(path)))
 			SysFileSystem.createDirectory(cwd(path));
 		#end
+
+		clearCache();
 	}
 
 	public static function deleteFile(path:String):Void
@@ -197,6 +200,8 @@ class FileSystem
 			SysFileSystem.deleteFile(cwd(path));
 		#end
 		#end
+
+		clearCache();
 	}
 
 	public static function deleteDirectory(path:String):Void
@@ -214,6 +219,8 @@ class FileSystem
 			SysFileSystem.deleteDirectory(cwd(path));
 		#end
 		#end
+
+		clearCache();
 	}
 
 	public static function readDirectory(path:String):Array<String>
@@ -276,6 +283,67 @@ class FileSystem
 	#end
 
 	#if (linux && FEATURE_MODS)
+	// Directory listings for getCaseInsensitivePath(): directory -> (lowercase name -> real name), or
+	// null for a path that is not a readable directory. The walk below only runs once the exact path
+	// failed a stat, i.e. for wrongly-cased paths and for files that do not exist - and Paths probes
+	// many of those (every mod folder and GPU format before the fallback). Re-reading each parent
+	// directory for every one of them made plain lookups cost several opendir/getdents/close rounds.
+	// Cleared on any write through backend.io and on Paths.clearStoredMemory().
+	static final dirEntries:Map<String, Null<Map<String, String>>> = [];
+	static final dirEntriesMutex:Mutex = new Mutex();
+
+	static function getDirEntries(dir:String):Null<Map<String, String>>
+	{
+		dirEntriesMutex.acquire();
+		var entries:Null<Map<String, String>> = dirEntries.get(dir);
+		if (entries == null && !dirEntries.exists(dir))
+		{
+			var names:Null<Array<String>> = null;
+			try
+			{
+				if (SysFileSystem.exists(dir) && SysFileSystem.isDirectory(dir))
+					names = SysFileSystem.readDirectory(dir);
+			}
+			catch (e:Dynamic)
+			{
+			}
+
+			if (names != null)
+			{
+				entries = [];
+				for (name in names)
+				{
+					final lower:String = name.toLowerCase();
+					// First match wins, like the linear scan this replaces.
+					if (!entries.exists(lower))
+						entries.set(lower, name);
+				}
+			}
+			dirEntries.set(dir, entries);
+		}
+		dirEntriesMutex.release();
+		return entries;
+	}
+	#end
+
+	/**
+	 * Drops the cached directory listings used to resolve wrongly-cased paths on Linux.
+	 */
+	public static function clearCache():Void
+	{
+		#if (linux && FEATURE_MODS)
+		dirEntriesMutex.acquire();
+		dirEntries.clear();
+		dirEntriesMutex.release();
+		#end
+	}
+
+	#if (linux && FEATURE_MODS)
+	/**
+	 * Returns `path` with each component matched case-insensitively against what is on disk, or
+	 * null when no such file or directory exists. A non-null result has been checked to exist.
+	 */
+	@:allow(backend.io.File)
 	static function getCaseInsensitivePath(path:String):String
 	{
 		if (SysFileSystem.exists(path))
@@ -292,27 +360,25 @@ class FileSystem
 			if (part == "")
 				continue;
 
-			if (!SysFileSystem.exists(current) || !SysFileSystem.isDirectory(current))
+			final entries:Null<Map<String, String>> = getDirEntries(current);
+			if (entries == null)
 				return null;
 
-			var files:Array<String> = SysFileSystem.readDirectory(current);
-
-			var found:Bool = false;
-			for (f in files)
-			{
-				if (f.toLowerCase() == part.toLowerCase())
-				{
-					if (current == "/")
-						current += f;
-					else
-						current += "/" + f;
-					found = true;
-					break;
-				}
-			}
-
-			if (!found)
+			final found:Null<String> = entries.get(part.toLowerCase());
+			if (found == null)
 				return null;
+
+			if (current == "/")
+				current += found;
+			else
+				current += "/" + found;
+		}
+
+		// The listings may predate a change made outside backend.io.
+		if (!SysFileSystem.exists(current))
+		{
+			clearCache();
+			return null;
 		}
 
 		return current;

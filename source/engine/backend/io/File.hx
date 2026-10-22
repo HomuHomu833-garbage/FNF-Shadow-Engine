@@ -114,6 +114,8 @@ class File
 		#if FEATURE_MODS
 		SysFile.saveContent(cwd(path), cwd(content));
 		#end
+
+		FileSystem.clearCache();
 	}
 
 	public static function saveBytes(path:String, bytes:haxe.io.Bytes):Void
@@ -121,6 +123,8 @@ class File
 		#if FEATURE_MODS
 		SysFile.saveBytes(cwd(path), bytes);
 		#end
+
+		FileSystem.clearCache();
 	}
 
 	public static function read(path:String, binary:Bool = true):Null<#if sys FileInput #else Dynamic #end>
@@ -145,6 +149,8 @@ class File
 
 	public static function write(path:String, binary:Bool = true):Null<#if sys FileOutput #else Dynamic #end>
 	{
+		FileSystem.clearCache();
+
 		#if FEATURE_MODS
 		#if linux
 		var actualPath:String = cwd(path);
@@ -162,6 +168,8 @@ class File
 
 	public static function append(path:String, binary:Bool = true):Null<#if sys FileOutput #else Dynamic #end>
 	{
+		FileSystem.clearCache();
+
 		#if FEATURE_MODS
 		#if linux
 		var actualPath:String = cwd(path);
@@ -179,6 +187,8 @@ class File
 
 	public static function update(path:String, binary:Bool = true):Null<#if sys FileOutput #else Dynamic #end>
 	{
+		FileSystem.clearCache();
+
 		#if FEATURE_MODS
 		#if linux
 		var actualPath:String = cwd(path);
@@ -207,49 +217,12 @@ class File
 		SysFile.copy(srcPath, cwd(dstPath));
 		#end
 		#end
+
+		FileSystem.clearCache();
 	}
 
 	#if (linux && FEATURE_MODS)
-	static function getCaseInsensitivePath(path:String):String
-	{
-		if (SysFileSystem.exists(path))
-			return path;
-
-		var parts:Array<String> = path.split("/");
-		var current:String = Sys.getCwd();
-
-		if (path.charAt(0) == "/")
-			current = "/";
-
-		for (part in parts)
-		{
-			if (part == "")
-				continue;
-
-			if (!SysFileSystem.exists(current) || !SysFileSystem.isDirectory(current))
-				return null;
-
-			var files:Array<String> = SysFileSystem.readDirectory(current);
-
-			var found:Bool = false;
-			for (f in files)
-			{
-				if (f.toLowerCase() == part.toLowerCase())
-				{
-					if (current == "/")
-						current += f;
-					else
-						current += "/" + f;
-					found = true;
-					break;
-				}
-			}
-
-			if (!found)
-				return null;
-		}
-
-		return current;
-	}
+	inline static function getCaseInsensitivePath(path:String):String
+		return FileSystem.getCaseInsensitivePath(path);
 	#end
 }
